@@ -332,6 +332,22 @@ input[type="range"] { width: 100%; accent-color: var(--primary); min-height: 28p
   -webkit-mask-position: center; mask-position: center;
 }
 
+/* Celular: opções em cima, preview fixo embaixo (acompanha a rolagem) */
+@media (max-width: 959px) {
+  .layout { display: flex; flex-direction: column; gap: 0; }
+  .preview-col { display: contents; }
+  .preview-col > * { order: 3; }
+  .controls { order: 1; }
+  .preview-col > .stage {
+    order: 2;
+    position: sticky;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 5;
+    width: min(100%, calc(28vh * 16 / 9));
+    margin: 20px auto 0;
+  }
+}
+
 /* Footer */
 .foot { border-top: 1px solid var(--line); background: var(--surface-well); padding: 28px 16px; }
 .foot p { width: min(100%, 44rem); margin: 0 auto; font-size: 13px; color: var(--text-dim); text-align: center; }
