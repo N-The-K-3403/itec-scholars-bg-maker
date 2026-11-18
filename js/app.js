@@ -4,8 +4,11 @@
   /* ---------- Config ---------- */
   const BGS = [
     'itec_bg.png', 'itec_bg2.png', 'itec_bg3.png', 'itec_bg4.png', 'itec_bg5.png', 'itec_bg6.png',
-    'itec_bg7.png', 'itec_bg9.png', 'itec_bg10.png', 'itec_bg11.png', 'itec_bg12.png', 'itec_bg13.png'
-  ];
+    'itec_bg7.png', 'itec_bg9.png', 'itec_bg10.png'
+  ].map((f) => 'img/backgrounds/' + f);
+
+  // Imagens brancas sobre azul: viram "mapa de gradiente" (preto e branco -> 2 cores escolhidas)
+  const MAPS = ['itec_bg11.png', 'itec_bg12.png', 'itec_bg13.png'].map((f) => 'img/backgrounds/' + f);
 
   // Paleta oficial do projeto: #047579 #E9AC63 #CCD5CC #003237 #3C3C3C
   // As marcas existem em 4 cores (arquivos), então cada uma usa a cor da paleta mais próxima.
@@ -63,18 +66,21 @@
   ];
 
   const BG_PALETTE = ['#047579', '#E9AC63', '#CCD5CC', '#003237', '#3C3C3C', '#FFFFFF'];
+  const MAP_PALETTE = ['#000000', ...BG_PALETTE];
 
   function markSrc(kind, color) {
     if (color === 'custom') color = 'branco'; // só o canal alfa importa; a cor é aplicada por cima
-    if (kind === 'logotipo') return `logotipo-${color}.png`;
-    if (kind === 'giro') return `giro_logo_${color}.gif`;
-    return color === 'dourado' ? 'logo-dourado.png' : `logo_${color}.png`;
+    if (kind === 'logotipo') return `img/logos/logotipo-${color}.png`;
+    if (kind === 'giro') return `img/logos/giro/giro_logo_${color}.gif`;
+    return color === 'dourado' ? 'img/logos/logo-dourado.png' : `img/logos/logo_${color}.png`;
   }
 
   const state = {
     bgType: 'img', // 'img' = imagem pronta, 'gen' = padrão gerado
     bg: BGS[0],
     gen: 'linear',
+    map: MAPS[0],
+    grad: { c0: '#000000', c1: '#ffffff', p0: 0, p1: 100 }, // cor escura, cor clara, onde cada uma começa/termina (%)
     bgA: '#003237',
     bgB: '#047579',
     kind: 'none',
@@ -282,7 +288,68 @@
   }
 
   function getBgImg() {
-    return state.bgType === 'gen' ? Promise.resolve(null) : loadImg(state.bg);
+    if (state.bgType === 'gen') return Promise.resolve(null);
+    return loadImg(state.bgType === 'map' ? state.map : state.bg);
+  }
+
+  /* ---------- Mapa de gradiente (imagem -> 2 cores) ---------- */
+  // Guarda a luminosidade de cada pixel (já com o contraste esticado: o azul vira 0 e o branco vira 255).
+  const lumaCache = new Map();
+  function getLuma(img, W, H) {
+    const key = img.src + '|' + W + 'x' + H;
+    let e = lumaCache.get(key);
+    if (e) return e;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(img, 0, 0, W, H);
+    const d = x.getImageData(0, 0, W, H).data;
+    const n = W * H;
+    const luma = new Uint8Array(n);
+    const alpha = new Uint8Array(n);
+    let lo = 255, hi = 0;
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const l = Math.round(0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2]);
+      luma[i] = l;
+      alpha[i] = d[p + 3];
+      if (l < lo) lo = l;
+      if (l > hi) hi = l;
+    }
+    const range = Math.max(1, hi - lo);
+    for (let i = 0; i < n; i++) luma[i] = Math.round((luma[i] - lo) * 255 / range);
+    e = { luma, alpha };
+    lumaCache.set(key, e);
+    return e;
+  }
+
+  // Tabela de 256 cores: do escuro ao claro, respeitando onde cada marcador está.
+  function buildLut() {
+    const { c0, c1, p0, p1 } = state.grad;
+    const A = hexToRgb(c0), B = hexToRgb(c1);
+    const lo = p0 / 100, span = Math.max(0.0001, (p1 - p0) / 100);
+    const lut = new Uint8ClampedArray(256 * 3);
+    for (let i = 0; i < 256; i++) {
+      const t = Math.min(1, Math.max(0, (i / 255 - lo) / span));
+      for (let k = 0; k < 3; k++) lut[i * 3 + k] = Math.round(A[k] + (B[k] - A[k]) * t);
+    }
+    return lut;
+  }
+
+  function drawMapped(ctx, W, H, img) {
+    try {
+      const { luma, alpha } = getLuma(img, W, H);
+      const lut = buildLut();
+      const out = ctx.createImageData(W, H);
+      const o = out.data;
+      for (let i = 0, p = 0; i < luma.length; i++, p += 4) {
+        const k = luma[i] * 3;
+        o[p] = lut[k]; o[p + 1] = lut[k + 1]; o[p + 2] = lut[k + 2]; o[p + 3] = alpha[i];
+      }
+      ctx.putImageData(out, 0, 0);
+    } catch (e) {
+      // abrindo direto do arquivo (file://) o navegador bloqueia a leitura dos pixels
+      ctx.drawImage(img, 0, 0, W, H);
+    }
   }
 
   /* ---------- Cor personalizada da marca ---------- */
@@ -303,6 +370,7 @@
   function drawBase(ctx, W, H, bgImg, markImg) {
     ctx.clearRect(0, 0, W, H);
     if (state.bgType === 'gen') drawGenerated(ctx, W, H, state.gen, state.bgA, state.bgB);
+    else if (state.bgType === 'map') drawMapped(ctx, W, H, bgImg);
     else ctx.drawImage(bgImg, 0, 0, W, H);
     if (markImg && state.kind !== 'none' && state.kind !== 'giro') {
       const aspect = markImg.naturalWidth / markImg.naturalHeight;
@@ -346,7 +414,7 @@
       getBgImg(),
       needsMark ? loadImg(markSrc(state.kind, state.color)) : Promise.resolve(null)
     ]).catch((e) => { console.error(e); return [null, null]; });
-    if (my !== token || (state.bgType === 'img' && !bgImg)) return;
+    if (my !== token || (state.bgType !== 'gen' && !bgImg)) return;
 
     const W = baseCanvas.width, H = baseCanvas.height;
     const drawable = markImg && state.color === 'custom' ? tint(markImg, state.customHex) : markImg;
@@ -427,21 +495,52 @@
       });
       box.appendChild(b);
     });
+    // as 3 imagens brancas sobre azul entram aqui, em preto e branco (mapa de gradiente)
+    MAPS.forEach((src, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'thumb';
+      b.dataset.map = src;
+      b.title = `Imagem ${i + 1} (mapa de gradiente)`;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', `Imagem em mapa de gradiente ${i + 1}`);
+      b.setAttribute('aria-checked', 'false');
+      const c = document.createElement('canvas');
+      c.width = 320; c.height = 180;
+      b.appendChild(c);
+      b.addEventListener('click', () => {
+        state.bgType = 'map';
+        state.map = src;
+        syncBgUI();
+        renderPreview();
+      });
+      box.appendChild(b);
+    });
     refreshGenThumbs();
   }
 
   function refreshGenThumbs() {
     [...$('genThumbs').children].forEach((b) => {
       const c = b.firstChild;
-      drawGenerated(c.getContext('2d'), c.width, c.height, b.dataset.gen, state.bgA, state.bgB);
+      const ctx = c.getContext('2d');
+      if (b.dataset.map) {
+        loadImg(b.dataset.map).then((img) => drawMapped(ctx, c.width, c.height, img)).catch(() => {});
+      } else {
+        drawGenerated(ctx, c.width, c.height, b.dataset.gen, state.bgA, state.bgB);
+      }
     });
   }
 
   function syncBgUI() {
     const gen = state.bgType === 'gen';
-    [...$('thumbs').children].forEach((c) => c.setAttribute('aria-checked', String(!gen && c.dataset.src === state.bg)));
-    [...$('genThumbs').children].forEach((c) => c.setAttribute('aria-checked', String(gen && c.dataset.gen === state.gen)));
+    const map = state.bgType === 'map';
+    [...$('thumbs').children].forEach((c) => c.setAttribute('aria-checked', String(state.bgType === 'img' && c.dataset.src === state.bg)));
+    [...$('genThumbs').children].forEach((c) => {
+      const on = (gen && c.dataset.gen === state.gen) || (map && c.dataset.map === state.map);
+      c.setAttribute('aria-checked', String(on));
+    });
     $('genColors').hidden = !gen;
+    $('mapEditor').hidden = !map;
     const g = GENS.find((x) => x.id === state.gen);
     $('bgBField').hidden = !gen || !g.two;
   }
@@ -493,6 +592,7 @@
       custom.setSelected(!match);
     }
     sync();
+    return sync;
   }
 
   // Cores da marca: as 4 originais (com sombreado) + cor personalizada (cor única).
@@ -523,6 +623,72 @@
       custom.setSelected(state.color === 'custom');
     }
     sync();
+  }
+
+  // Slider de gradiente estilo Photoshop: 2 marcadores arrastáveis + cor de cada ponta + reset.
+  function setupGradEditor() {
+    const bar = $('gradBar'), fill = $('gradFill'), s0 = $('stop0'), s1 = $('stop1');
+    const g = state.grad;
+    let raf = 0;
+
+    const paint = () => {
+      fill.style.background = `linear-gradient(90deg, ${g.c0} 0%, ${g.c0} ${g.p0}%, ${g.c1} ${g.p1}%, ${g.c1} 100%)`;
+      s0.style.left = g.p0 + '%';
+      s1.style.left = g.p1 + '%';
+      s0.style.setProperty('--stop', g.c0);
+      s1.style.setProperty('--stop', g.c1);
+      s0.setAttribute('aria-valuenow', g.p0);
+      s1.setAttribute('aria-valuenow', g.p1);
+      $('gradOut').textContent = `${g.p0}% – ${g.p1}%`;
+    };
+    // no máximo uma atualização pesada por quadro enquanto arrasta
+    const apply = () => {
+      paint();
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        refreshGenThumbs();
+        renderPreview();
+      });
+    };
+
+    const setPos = (which, v) => {
+      v = Math.round(v);
+      if (which === 0) g.p0 = Math.max(0, Math.min(g.p1 - 1, v));
+      else g.p1 = Math.max(g.p0 + 1, Math.min(100, v));
+      apply();
+    };
+
+    [s0, s1].forEach((el, which) => {
+      el.addEventListener('pointerdown', (e) => {
+        el.setPointerCapture(e.pointerId);
+        el.focus();
+        e.preventDefault();
+      });
+      el.addEventListener('pointermove', (e) => {
+        if (!el.hasPointerCapture(e.pointerId)) return;
+        const r = bar.getBoundingClientRect();
+        setPos(which, ((e.clientX - r.left) / r.width) * 100);
+      });
+      el.addEventListener('keydown', (e) => {
+        const step = e.shiftKey ? 10 : 1;
+        const cur = which ? g.p1 : g.p0;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { setPos(which, cur - step); e.preventDefault(); }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { setPos(which, cur + step); e.preventDefault(); }
+      });
+    });
+
+    const syncA = hexPicker($('gradAChips'), MAP_PALETTE, () => g.c0, (h) => { g.c0 = h; apply(); });
+    const syncB = hexPicker($('gradBChips'), MAP_PALETTE, () => g.c1, (h) => { g.c1 = h; apply(); });
+
+    $('gradReset').addEventListener('click', () => {
+      Object.assign(g, { c0: '#000000', c1: '#ffffff', p0: 0, p1: 100 });
+      syncA();
+      syncB();
+      apply();
+    });
+
+    paint();
   }
 
   function radioGroup(box, items, getValue, onPick, kind) {
@@ -609,6 +775,8 @@
   hexPicker($('bgAChips'), BG_PALETTE, () => state.bgA, (h) => { state.bgA = h; onBgColor(); });
   hexPicker($('bgBChips'), BG_PALETTE, () => state.bgB, (h) => { state.bgB = h; onBgColor(); });
   hexPicker($('textColorChips'), [...TEXT_COLORS.map((c) => c.hex), '#FFFFFF'], () => state.textColor, (h) => { state.textColor = h; renderPreview(); });
+
+  setupGradEditor();
 
   $('opacity').addEventListener('input', (e) => {
     state.opacity = e.target.value / 100;

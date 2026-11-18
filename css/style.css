@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Pavilion";
-  src: local("Pavilion"), url("Pavilion.otf") format("opentype");
+  src: local("Pavilion"), url("../fonts/Pavilion.otf") format("opentype");
   font-weight: 400;
   font-display: swap;
 }
@@ -331,6 +331,28 @@ input[type="range"] { width: 100%; accent-color: var(--primary); min-height: 28p
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   -webkit-mask-position: center; mask-position: center;
 }
+
+/* Mapa de gradiente (estilo Photoshop) */
+.gradbar { position: relative; height: 58px; margin: 4px 12px 0; }
+.gradbar-fill {
+  position: absolute; left: 0; right: 0; top: 0; height: 30px;
+  border-radius: 6px; border: 1px solid var(--swatch-line);
+}
+.gradstop {
+  position: absolute; top: 33px; width: 24px; height: 22px; margin-left: -12px;
+  cursor: ew-resize; touch-action: none; outline: none;
+}
+.gradstop::before {
+  content: ''; position: absolute; top: 0; left: 7px;
+  border: 5px solid transparent; border-top: 0; border-bottom: 6px solid var(--text-dim);
+}
+.gradstop::after {
+  content: ''; position: absolute; top: 6px; left: 0; width: 24px; height: 16px;
+  box-sizing: border-box; border-radius: 4px;
+  background: var(--stop, #000); border: 2px solid var(--swatch-line);
+}
+.gradstop:hover::after { border-color: var(--primary); }
+.gradstop:focus-visible::after { border-color: var(--primary); box-shadow: var(--focus-ring); }
 
 /* Celular: opções em cima, preview fixo embaixo (acompanha a rolagem) */
 @media (max-width: 959px) {

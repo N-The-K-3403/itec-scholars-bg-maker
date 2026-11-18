@@ -9,17 +9,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="icon" href="logo_azul.png">
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="img/logos/logo_azul.png">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <a class="skip" href="#gerador">Ir para o gerador</a>
 
 <header class="hero">
-  <img class="hero-mark" src="logo_branco.png" alt="" aria-hidden="true">
+  <img class="hero-mark" src="img/logos/logo_branco.png" alt="" aria-hidden="true">
   <div class="hero-inner">
     <div class="lockup">
-      <img src="logotipo-branco.png" alt="ITEC">
+      <img src="img/logos/logotipo-branco.png" alt="ITEC">
       <span class="rule" aria-hidden="true"></span>
       <span class="scholars">Scholars</span>
     </div>
@@ -78,6 +78,28 @@
             <div class="swatches" id="bgBChips" role="radiogroup" aria-label="Cor 2 do fundo"></div>
           </div>
         </div>
+        <div id="mapEditor" hidden>
+          <div class="field">
+            <span class="label">Mapa de gradiente <output id="gradOut">0% – 100%</output></span>
+            <div class="gradbar" id="gradBar">
+              <div class="gradbar-fill" id="gradFill"></div>
+              <div class="gradstop" id="stop0" role="slider" tabindex="0" aria-label="Onde a cor escura termina" aria-valuemin="0" aria-valuemax="99" aria-valuenow="0"></div>
+              <div class="gradstop" id="stop1" role="slider" tabindex="0" aria-label="Onde a cor clara começa" aria-valuemin="1" aria-valuemax="100" aria-valuenow="100"></div>
+            </div>
+            <p class="hint">Arraste os marcadores para escolher de onde cada cor começa.</p>
+          </div>
+          <div class="field">
+            <span class="label">Cor 1</span>
+            <div class="swatches" id="gradAChips" role="radiogroup" aria-label="Cor escura"></div>
+          </div>
+          <div class="field">
+            <span class="label">Cor 2</span>
+            <div class="swatches" id="gradBChips" role="radiogroup" aria-label="Cor clara"></div>
+          </div>
+          <div class="field">
+            <button class="btn secondary" id="gradReset" type="button">Voltar para preto e branco</button>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -130,6 +152,6 @@
   <p>Projeto feito pelo Scholar <strong>Elias Aguiar de Moraes</strong>. Sem vínculo oficial com o <strong>ITEC — Instituto de Tecnologia da Computação</strong>. A marca e as imagens pertencem ao ITEC.</p>
 </footer>
 
-<script src="app.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
